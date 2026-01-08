@@ -1,4 +1,4 @@
-module github.com/restayway/gorm-cache
+module github.com/Thomas0x1f/gorm-cache
 
 go 1.21
 
