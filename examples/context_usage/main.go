@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	gormcache "github.com/restayway/gorm-cache"
+	gormcache "github.com/Thomas0x1f/gorm-cache"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
