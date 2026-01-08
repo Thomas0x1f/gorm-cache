@@ -184,6 +184,11 @@ func (p *CachePlugin) afterQueryCallback(db *gorm.DB) {
 		return
 	}
 
+	// 不缓存空值结果
+	if isEmptyResult(db.Statement.Dest) {
+		return
+	}
+
 	// Serialize result
 	cachedData, err := json.Marshal(db.Statement.Dest)
 	if err != nil {
@@ -246,5 +251,24 @@ func calculateRowsAffected(dest any) int64 {
 		return 1
 	default:
 		return 0
+	}
+}
+
+// isEmptyResult 检查查询结果是否为空
+func isEmptyResult(dest any) bool {
+	if dest == nil {
+		return true
+	}
+
+	reflectValue := reflect.Indirect(reflect.ValueOf(dest))
+	switch reflectValue.Kind() {
+	case reflect.Slice:
+		// 切片为空
+		return reflectValue.Len() == 0
+	case reflect.Struct:
+		// 结构体检查是否是零值
+		return reflectValue.IsZero()
+	default:
+		return true
 	}
 }
