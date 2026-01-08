@@ -3,13 +3,25 @@ package gormcache
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/callbacks"
 )
 
 const (
 	pluginName = "gorm:cache"
 )
+
+// ErrCacheHit 是一个内部使用的 Error，用于在缓存命中时跳过数据库查询
+// 这个 Error 会在 afterQueryCallback 中被自动移除，用户不会看到它
+type ErrCacheHit struct {
+	RowsAffected int64
+}
+
+func (e *ErrCacheHit) Error() string {
+	return "gorm:cache:hit - this is an internal error and should be cleared by cache plugin"
+}
 
 // CachePlugin is a GORM plugin that provides caching functionality
 type CachePlugin struct {
@@ -81,6 +93,11 @@ func (p *CachePlugin) Initialize(db *gorm.DB) error {
 
 // queryCallback is executed before query to check cache
 func (p *CachePlugin) queryCallback(db *gorm.DB) {
+	// 如果已经有错误，不处理缓存逻辑
+	if db.Error != nil {
+		return
+	}
+
 	// Skip if cache should be skipped
 	if p.config.shouldSkipCache(db) {
 		return
@@ -89,6 +106,10 @@ func (p *CachePlugin) queryCallback(db *gorm.DB) {
 	// Skip if model should not be cached
 	if !p.config.shouldCacheModel(db) {
 		return
+	}
+
+	if db.Statement.SQL.Len() == 0 {
+		callbacks.BuildQuerySQL(db)
 	}
 
 	// Skip if not a SELECT query
@@ -115,22 +136,32 @@ func (p *CachePlugin) queryCallback(db *gorm.DB) {
 	// Cache hit - deserialize and set the result
 	if db.Statement.Dest != nil {
 		if err := json.Unmarshal(cachedData, db.Statement.Dest); err == nil {
-			// Mark that we used cache
-			db.Statement.Settings.Store("gorm:cache:hit", true)
-			// Skip the actual query
-			db.Statement.SkipHooks = true
+			// 计算 RowsAffected
+			rowsAffected := calculateRowsAffected(db.Statement.Dest)
+
+			// 设置特殊 Error 以跳过数据库查询
+			// 注意：此时 db.Error 保证为 nil（函数开头已检查）
+			db.Error = &ErrCacheHit{RowsAffected: rowsAffected}
 		}
 	}
 }
 
 // afterQueryCallback is executed after query to store results in cache
 func (p *CachePlugin) afterQueryCallback(db *gorm.DB) {
-	// Check if cache was hit
-	if v, ok := db.Statement.Settings.Load("gorm:cache:hit"); ok {
-		if hit, ok := v.(bool); ok && hit {
-			// Already got from cache, no need to store
-			return
-		}
+	// 首先检查是否是缓存命中的情况
+	if cacheHitErr, ok := db.Error.(*ErrCacheHit); ok {
+		// 设置 RowsAffected
+		db.RowsAffected = cacheHitErr.RowsAffected
+
+		// 清除 Error，使用户看不到它
+		db.Error = nil
+
+		// Already got from cache, no need to store
+		return
+	}
+	// Skip if there was an error
+	if db.Error != nil {
+		return
 	}
 
 	// Skip if cache should be skipped
@@ -140,11 +171,6 @@ func (p *CachePlugin) afterQueryCallback(db *gorm.DB) {
 
 	// Skip if model should not be cached
 	if !p.config.shouldCacheModel(db) {
-		return
-	}
-
-	// Skip if there was an error
-	if db.Error != nil {
 		return
 	}
 
@@ -203,4 +229,22 @@ func (p *CachePlugin) Close() error {
 		return p.config.Adapter.Close()
 	}
 	return nil
+}
+
+// calculateRowsAffected 计算从缓存恢复的数据的行数
+func calculateRowsAffected(dest any) int64 {
+	if dest == nil {
+		return 0
+	}
+
+	reflectValue := reflect.Indirect(reflect.ValueOf(dest))
+	switch reflectValue.Kind() {
+	case reflect.Slice:
+		return int64(reflectValue.Len())
+	case reflect.Struct:
+		// 单条记录，如果是有效的结构体则返回 1
+		return 1
+	default:
+		return 0
+	}
 }
