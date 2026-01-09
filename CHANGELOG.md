@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.0] - 2026-01-09
+
+### Added
+- `Serializer` interface for pluggable serialization backends
+- `JSONSerializer` implementation (default, backward compatible)
+- `MsgPackSerializer` implementation for improved performance and smaller payload size
+- `Serializer` field in `Config` to allow custom serialization strategies
+- Support for MessagePack serialization via `github.com/vmihailenco/msgpack/v5`
+
+### Changed
+- Cache serialization now uses configurable `Serializer` instead of hardcoded JSON
+- Default configuration uses `JSONSerializer` for backward compatibility
+
+### Performance
+- MsgPack serialization provides 2-5x faster encoding/decoding compared to JSON
+- MsgPack typically reduces payload size by 20-50% compared to JSON
+- Reduced Redis memory usage and network transfer time when using MsgPack
+
 ## [v0.0.2] - 2026-01-09
 
 ### Added
@@ -40,5 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Existing errors are no longer overwritten by cache operations
 - Query metadata (RowsAffected) is correctly preserved for cached results
 
+[v0.1.0]: https://github.com/Thomas0x1f/gorm-cache/releases/tag/v0.1.0
 [v0.0.2]: https://github.com/Thomas0x1f/gorm-cache/releases/tag/v0.0.2
 [v0.0.1]: https://github.com/Thomas0x1f/gorm-cache/releases/tag/v0.0.1

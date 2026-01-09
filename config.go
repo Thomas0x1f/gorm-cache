@@ -41,6 +41,10 @@ type Config struct {
 	// CacheKeyGenerator allows custom cache key generation
 	// If nil, default key generator will be used
 	CacheKeyGenerator func(*gorm.DB) string
+
+	// Serializer is the data serialization implementation
+	// If nil, default JSON serializer will be used
+	Serializer Serializer
 }
 
 // DefaultConfig returns a default configuration
@@ -55,6 +59,7 @@ func DefaultConfig() Config {
 		KeyPrefix:          "gorm:cache:",
 		SkipCacheCondition: nil,
 		CacheKeyGenerator:  nil,
+		Serializer:         &JSONSerializer{}, // 默认使用 JSON
 	}
 }
 

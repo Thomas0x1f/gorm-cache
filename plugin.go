@@ -2,7 +2,6 @@ package gormcache
 
 import (
 	"context"
-	"encoding/json"
 	"reflect"
 
 	"gorm.io/gorm"
@@ -38,6 +37,10 @@ func New(config Config) *CachePlugin {
 	}
 	if config.KeyPrefix == "" {
 		config.KeyPrefix = DefaultConfig().KeyPrefix
+	}
+	// 如果没有指定序列化器，使用默认的 JSON 序列化器
+	if config.Serializer == nil {
+		config.Serializer = &JSONSerializer{}
 	}
 
 	return &CachePlugin{
@@ -135,7 +138,7 @@ func (p *CachePlugin) queryCallback(db *gorm.DB) {
 
 	// Cache hit - deserialize and set the result
 	if db.Statement.Dest != nil {
-		if err := json.Unmarshal(cachedData, db.Statement.Dest); err == nil {
+		if err := p.config.Serializer.Unmarshal(cachedData, db.Statement.Dest); err == nil {
 			// 计算 RowsAffected
 			rowsAffected := calculateRowsAffected(db.Statement.Dest)
 
@@ -189,8 +192,8 @@ func (p *CachePlugin) afterQueryCallback(db *gorm.DB) {
 		return
 	}
 
-	// Serialize result
-	cachedData, err := json.Marshal(db.Statement.Dest)
+	// Serialize result using configured serializer
+	cachedData, err := p.config.Serializer.Marshal(db.Statement.Dest)
 	if err != nil {
 		return
 	}
