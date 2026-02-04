@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.1] - 2026-02-04
+
+### Fixed
+- COUNT query results now properly retrieved from cache instead of returning 0
+- `calculateRowsAffected` now correctly handles primitive types (int64, uint64, float, etc.)
+- Deserialization errors now gracefully fall back to database queries
+
+### Added
+- Comprehensive test coverage for COUNT query caching with MsgPack serializer
+- Test cases for COUNT queries with and without conditions
+
+### Technical Details
+The root cause was that primitive types in `calculateRowsAffected` were returning 0 for RowsAffected, causing GORM to overwrite the correctly deserialized COUNT value with 0. This fix ensures that COUNT queries (which return a single primitive value) report RowsAffected=1, allowing GORM to preserve the cached count value.
+
 ## [v0.1.0] - 2026-01-09
 
 ### Added
@@ -58,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Existing errors are no longer overwritten by cache operations
 - Query metadata (RowsAffected) is correctly preserved for cached results
 
+[v0.1.1]: https://github.com/Thomas0x1f/gorm-cache/releases/tag/v0.1.1
 [v0.1.0]: https://github.com/Thomas0x1f/gorm-cache/releases/tag/v0.1.0
 [v0.0.2]: https://github.com/Thomas0x1f/gorm-cache/releases/tag/v0.0.2
 [v0.0.1]: https://github.com/Thomas0x1f/gorm-cache/releases/tag/v0.0.1
