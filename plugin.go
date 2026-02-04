@@ -145,6 +145,9 @@ func (p *CachePlugin) queryCallback(db *gorm.DB) {
 			// 设置特殊 Error 以跳过数据库查询
 			// 注意：此时 db.Error 保证为 nil（函数开头已检查）
 			db.Error = &ErrCacheHit{RowsAffected: rowsAffected}
+		} else {
+			// 反序列化失败，继续执行数据库查询
+			db.Statement.Settings.Store("gorm:cache:key", cacheKey)
 		}
 	}
 }
@@ -251,6 +254,11 @@ func calculateRowsAffected(dest any) int64 {
 		return int64(reflectValue.Len())
 	case reflect.Struct:
 		// 单条记录，如果是有效的结构体则返回 1
+		return 1
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64, reflect.String, reflect.Bool:
+		// 基本类型（如 COUNT 查询的 *int64），返回 1 表示查询返回了 1 行结果
 		return 1
 	default:
 		return 0
